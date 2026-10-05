@@ -804,10 +804,27 @@ a:focus-visible {
     to { transform: translateX(0); opacity: 1; }
 }
 
+@media (max-width: 1199px) {
+    .masthead {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+    }
+
+    .masthead-brand {
+        margin-inline: auto;
+    }
+
+    .event-status {
+        justify-self: center;
+        margin-right: 0;
+    }
+}
+
 @media (max-width: 1180px) {
     .masthead {
         grid-template-columns: minmax(0, 1fr);
         gap: 10px;
+        padding: 5px;
     }
 
     .masthead-brand {
@@ -843,6 +860,10 @@ a:focus-visible {
         padding: 7px;
     }
 
+    .eyebrow {
+        font-size: 7px;
+    }
+
     .masthead {
         grid-template-columns: minmax(0, 1fr);
         gap: 10px;
@@ -866,8 +887,28 @@ a:focus-visible {
         font-size: 15px;
     }
 
+    .podium-slot small {
+        font-size: 10px;
+    }
+
     .event-status {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            "countdown"
+            "live-tag";
+        width: 100%;
+        margin-right: 0;
         padding-inline: 0;
+        gap: 8px;
+    }
+
+    .event-status .countdown-skull {
+        display: none;
+    }
+
+    .event-status .countdown {
+        width: 100%;
+        max-width: 360px;
     }
 
     .countdown strong {
@@ -896,6 +937,7 @@ a:focus-visible {
     .stats {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         row-gap: 8px;
+        padding: 5px;
     }
 
     .promo-strip {
@@ -957,6 +999,11 @@ a:focus-visible {
 }
 
 @media (max-width: 360px) {
+    .event-status .countdown {
+        width: 100%;
+        max-width: none;
+    }
+
     .countdown strong {
         font-size: 19px;
     }
