@@ -30,7 +30,7 @@ final class KillmailStore
                 if ($characterName === null && $this->characters !== null) {
                     $characterName = $this->characters->nameForCharacter($characterId);
                 }
-                $attacker->execute([$killmail['killmail_id'], $characterId, $characterName ?? 'Character #' . $characterId, $pilot['corporation_id'] ?? null, $pilot['alliance_id'], $pilot['ship_type_id'] ?? null, $pilot['weapon_type_id'] ?? null, (bool) ($pilot['final_blow'] ?? false), $pilot['damage_done'] ?? null]);
+                $attacker->execute([$killmail['killmail_id'], $characterId, $characterName ?? 'Character #' . $characterId, $pilot['corporation_id'] ?? null, $pilot['alliance_id'], $pilot['ship_type_id'] ?? null, $pilot['weapon_type_id'] ?? null, (int) (bool) ($pilot['final_blow'] ?? false), $pilot['damage_done'] ?? null]);
             }
             $this->pdo->commit();
         } catch (\Throwable $exception) {
