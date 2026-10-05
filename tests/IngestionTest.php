@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace CrimsonHarvest\Tests;
 
+use CrimsonHarvest\Competition\CompetitionRules;
 use CrimsonHarvest\Competition\ParticipationService;
+use CrimsonHarvest\Zkill\HistoricalImporter;
 use CrimsonHarvest\Zkill\KillmailIngestionService;
 use CrimsonHarvest\Zkill\KillmailStore;
+use CrimsonHarvest\Zkill\R2z2PayloadParser;
+use CrimsonHarvest\Zkill\SystemRegionResolver;
+use DateTimeImmutable;
 use PDO;
 use PDOStatement;
 use PHPUnit\Framework\TestCase;
@@ -68,5 +73,58 @@ final class IngestionTest extends TestCase
         ]);
 
         self::assertSame([0, 1, 0], $finalBlows);
+    }
+
+    public function testRawHistoryAppliesUtcWindowAlliancesAndLocationsWithoutUpdatingCursor(): void
+    {
+        $pdo = $this->createMock(PDO::class);
+        $killmailStatement = $this->createMock(PDOStatement::class);
+        $attackerStatement = $this->createMock(PDOStatement::class);
+        $pdo->expects(self::once())->method('beginTransaction')->willReturn(true);
+        $pdo->expects(self::exactly(2))->method('prepare')->willReturnCallback(
+            static function (string $sql) use ($killmailStatement, $attackerStatement): PDOStatement {
+                self::assertStringNotContainsString('feed_state', $sql);
+                return str_contains($sql, 'killmail_attackers') ? $attackerStatement : $killmailStatement;
+            },
+        );
+        $pdo->expects(self::once())->method('commit')->willReturn(true);
+        $pdo->expects(self::never())->method('rollBack');
+        $killmailStatement->expects(self::once())->method('execute')->with(self::callback(
+            static fn (array $parameters): bool => $parameters[0] === 42 && $parameters[8] === 'historical',
+        ))->willReturn(true);
+        $attackerStatement->expects(self::once())->method('execute')->willReturn(true);
+        $resolver = new class implements SystemRegionResolver {
+            public function regionForSystem(int $systemId): int
+            {
+                return $systemId === 30002050 ? 10000042 : 10000002;
+            }
+        };
+        $record = [
+            'killmail_id' => 42,
+            'killmail_time' => '2026-10-01T00:00:00Z',
+            'solar_system_id' => 30002050,
+            'victim' => [],
+            'attackers' => [['character_id' => 7, 'alliance_id' => 99013187, 'final_blow' => false]],
+        ];
+        $path = tempnam(sys_get_temp_dir(), 'crimson-history-');
+        self::assertNotFalse($path);
+        try {
+            file_put_contents($path, json_encode([
+                42 => $record,
+                43 => array_replace($record, ['killmail_id' => 43, 'killmail_time' => '2026-09-30T23:59:59Z']),
+                44 => array_replace($record, ['killmail_id' => 44, 'killmail_time' => '2026-10-02T00:00:00Z']),
+                45 => array_replace($record, ['killmail_id' => 45, 'solar_system_id' => 30000142]),
+                46 => array_replace($record, ['killmail_id' => 46, 'attackers' => [['character_id' => 8, 'alliance_id' => 1]]]),
+            ], JSON_THROW_ON_ERROR));
+            $importer = new HistoricalImporter(new R2z2PayloadParser($resolver), new KillmailStore($pdo, new ParticipationService()));
+            self::assertSame(1, $importer->importRawFile(
+                $path,
+                new CompetitionRules(30002050, 10000042, 10000030),
+                new DateTimeImmutable('2026-10-01T00:00:00Z'),
+                new DateTimeImmutable('2026-10-02T00:00:00Z'),
+            ));
+        } finally {
+            unlink($path);
+        }
     }
 }

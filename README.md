@@ -166,8 +166,23 @@ Run commands from the project root:
 | `php bin/enrich-characters.php` | Resolve stored fallback character names through ESI. |
 | `php bin/import-kill.php <killmail-id>` | Fetch one killmail and import it only if its time and location qualify for the configured event. |
 | `php bin/import-history.php path/to/r2z2-records.json` | Import an array of R2Z2 records from a trusted recovery file. |
+| `php -d memory_limit=1G bin/backfill-kills.php [YYYY-MM-DD [YYYY-MM-DD-exclusive-end]]` | Download published daily raw archives and import contest-eligible historical killmails. |
 
 Historical imports are recovery tools, not scheduled jobs. The history importer trusts the supplied records and does not apply the single-kill command's event-window and location checks; validate the input before importing. Reimporting qualifying killmails can restore attacker data missing from older records, but avoid importing arbitrary or unverified datasets.
+
+### Backfill published daily archives
+
+For the configured event, import published historical killmails from October 1 at midnight UTC through the current UTC time:
+
+```sh
+php -d memory_limit=1G bin/backfill-kills.php 2026-10-01
+```
+
+An optional second date is an exclusive midnight-UTC boundary. For example, `2026-10-01 2026-10-05` imports October 1 through October 4. Dates must be inside the event window and not in the future. The command downloads one raw archive per UTC day from `https://r2z2.zkillboard.com/history/raw/YYYYMMDD.json`, applies the event, alliance and location rules, and resolves character names. Each daily JSON archive is decoded in memory; the example allows up to 1 GiB, so check available memory before running it alongside PHP-FPM.
+
+Run only one backfill at a time. It does not read or update `feed_state`, so the existing live consumer can remain running. Existing killmail IDs are reused and attacker records are upserted, making interrupted ranges safe to rerun. Reported counts include previously imported records processed again, not just new rows. Existing live rows retain their source and metadata. Raw archives do not supply zKillboard valuation metadata, so newly imported archive rows can have no ISK value.
+
+Archives can lag, especially for the current UTC day, and late submissions can update previous days. An unavailable archive causes a nonzero exit instead of claiming completion; earlier imports remain saved. Rerun the same range later to fill published gaps. The archives cover killmails known to zKillboard, not all kills in EVE. Do not rewind the live cursor or start another consumer to perform this backfill.
 
 Hagilur is solar system `30002050`; Metropolis is region `10000042` and Heimatar is region `10000030`. Hagilur kills count in all contests for otherwise eligible characters. Attackers must belong to alliance ID `99013187` (The Obsidian Front - Reborn) or `99013786` (Cryonic Origin Alliance) to receive credit; NPCs and attackers without a valid character ID are excluded. Each character gets at most one credit per killmail, with no final-blow bonus. The current Hagilur top three are removed from the Metropolis / Heimatar leaderboard. The current regional prize winners are then removed from the raffle leaderboard. Lower-priority leaderboards are renumbered after exclusions, and eligibility is recalculated from the current standings on each dashboard update.
 
