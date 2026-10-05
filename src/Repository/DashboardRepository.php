@@ -22,10 +22,7 @@ final class DashboardRepository
         $hagilurRows = array_values(array_filter($participations, static fn (array $row): bool => (int) $row['solar_system_id'] === (int) $locations['hagilur']));
         $hagilur = $this->leaderboards->build($hagilurRows);
         $regional = $this->leaderboards->regionalWithEligibility($this->leaderboards->build($participations), $hagilur);
-        $raffle = array_map(static function (array $row): array {
-            $row['tickets'] = $row['kills'];
-            return $row;
-        }, $regional);
+        $raffle = $this->leaderboards->raffleFromRegional($regional);
         $recentQuery = $this->pdo->prepare("SELECT k.killmail_id, k.killmail_time, k.solar_system_id, COALESCE(s.name, CONCAT('System ', k.solar_system_id)) AS solar_system_name, COALESCE(MAX(CASE WHEN a.final_blow = 1 THEN a.character_name END), MIN(a.character_name)) AS attacker_name, k.victim_ship_type_id, k.victim_ship_name, k.zkill_url, COUNT(a.id) AS attacker_count FROM killmails k LEFT JOIN solar_systems s ON s.solar_system_id = k.solar_system_id LEFT JOIN killmail_attackers a ON a.killmail_id = k.killmail_id AND a.alliance_id IN (99013187, 99013786) AND NOT EXISTS (SELECT 1 FROM excluded_characters ec WHERE ec.character_id = a.character_id) WHERE k.data_source <> 'demo' AND k.killmail_time >= ? AND k.killmail_time < ? AND k.region_id IN (?, ?) AND NOT EXISTS (SELECT 1 FROM excluded_killmails ek WHERE ek.killmail_id = k.killmail_id) GROUP BY k.killmail_id HAVING attacker_count > 0 ORDER BY k.killmail_time DESC LIMIT 10");
         $recentQuery->execute([$event['starts_at'], $event['ends_at'], $locations['metropolis'], $locations['heimatar']]);
         $recent = $recentQuery->fetchAll();
@@ -43,11 +40,11 @@ final class DashboardRepository
         $feed = $this->pdo->query("SELECT last_sequence, updated_at FROM feed_state WHERE provider = 'r2z2'")->fetch() ?: null;
         $feedAge = $feed ? max(0, time() - strtotime($feed['updated_at'] . ' UTC')) : null;
         return [
-            'hagilur' => array_slice($hagilur, 0, 50),
+            'hagilur' => $hagilur,
             'hagilurPrizeWinners' => array_slice($hagilur, 0, 3),
-            'regional' => array_slice($regional, 0, 50),
+            'regional' => $regional,
             'regionalPrizeWinners' => array_values(array_filter($regional, static fn (array $pilot): bool => $pilot['prize_position'] !== null)),
-            'raffle' => array_slice($raffle, 0, 50),
+            'raffle' => $raffle,
             'recentKills' => $recent,
             'stats' => $stats,
             'ingestion' => [

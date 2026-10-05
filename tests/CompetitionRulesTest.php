@@ -50,7 +50,7 @@ final class CompetitionRulesTest extends TestCase
         self::assertSame(201, $board[0]['alliance_id']);
     }
 
-    public function testHagilurWinnerKeepsRegionalScorePositionButCannotWinRegionalPrize(): void
+    public function testHagilurWinnersAreRemovedFromRegionalAndRaffleStandings(): void
     {
         $service = new LeaderboardService();
         $hagilur = $service->build([
@@ -63,11 +63,16 @@ final class CompetitionRulesTest extends TestCase
             ['killmail_id' => 2, 'character_id' => 2, 'character_name' => 'Bravo'],
             ['killmail_id' => 3, 'character_id' => 3, 'character_name' => 'Charlie'],
             ['killmail_id' => 4, 'character_id' => 4, 'character_name' => 'Delta'],
+            ['killmail_id' => 5, 'character_id' => 5, 'character_name' => 'Echo'],
+            ['killmail_id' => 6, 'character_id' => 6, 'character_name' => 'Foxtrot'],
+            ['killmail_id' => 7, 'character_id' => 7, 'character_name' => 'Golf'],
         ]);
         $regional = $service->regionalWithEligibility($regional, $hagilur);
-        self::assertSame(1, $regional[0]['score_position']);
-        self::assertFalse($regional[0]['prize_eligible']);
-        self::assertSame(1, $regional[3]['prize_position']);
+        self::assertSame([4, 5, 6, 7], array_column($regional, 'character_id'));
+        self::assertSame([1, 2, 3, 4], array_column($regional, 'score_position'));
+        self::assertSame([1, 2, 3, null], array_column($regional, 'prize_position'));
+        self::assertSame([7], array_column($service->raffleFromRegional($regional), 'character_id'));
+        self::assertSame([1], array_column($service->raffleFromRegional($regional), 'score_position'));
     }
 
     public function testLocationsMatchConfiguredContestRegions(): void
@@ -101,18 +106,28 @@ final class CompetitionRulesTest extends TestCase
         self::assertSame(1, $board[0]['character_id']);
     }
 
-    public function testRaffleScoreIsUnaffectedByHagilurPrizeExclusion(): void
+    public function testRegionalWinnersAreRemovedFromRaffleAndTicketsAreDense(): void
     {
         $service = new LeaderboardService();
-        $hagilur = $service->build([['killmail_id' => 1, 'character_id' => 1, 'character_name' => 'Winner']]);
+        $hagilur = $service->build([
+            ['killmail_id' => 1, 'character_id' => 1, 'character_name' => 'Hagilur Winner'],
+            ['killmail_id' => 2, 'character_id' => 2, 'character_name' => 'Hagilur Winner Two'],
+            ['killmail_id' => 3, 'character_id' => 3, 'character_name' => 'Hagilur Winner Three'],
+        ]);
         $regional = $service->regionalWithEligibility($service->build([
-            ['killmail_id' => 1, 'character_id' => 1, 'character_name' => 'Winner'],
-            ['killmail_id' => 2, 'character_id' => 2, 'character_name' => 'Eligible'],
+            ['killmail_id' => 1, 'character_id' => 1, 'character_name' => 'Hagilur Winner'],
+            ['killmail_id' => 2, 'character_id' => 2, 'character_name' => 'Hagilur Winner Two'],
+            ['killmail_id' => 3, 'character_id' => 3, 'character_name' => 'Hagilur Winner Three'],
+            ['killmail_id' => 4, 'character_id' => 4, 'character_name' => 'Regional Winner'],
+            ['killmail_id' => 5, 'character_id' => 5, 'character_name' => 'Regional Winner Two'],
+            ['killmail_id' => 6, 'character_id' => 6, 'character_name' => 'Regional Winner Three'],
+            ['killmail_id' => 7, 'character_id' => 7, 'character_name' => 'Raffle Pilot'],
+            ['killmail_id' => 8, 'character_id' => 8, 'character_name' => 'Raffle Pilot Two'],
         ]), $hagilur);
-        $winner = array_values(array_filter($regional, static fn (array $pilot): bool => $pilot['character_id'] === 1))[0];
-        $eligible = array_values(array_filter($regional, static fn (array $pilot): bool => $pilot['character_id'] === 2))[0];
-        self::assertSame(1, $winner['kills']);
-        self::assertSame(1, $eligible['prize_position']);
+        $raffle = $service->raffleFromRegional($regional);
+        self::assertSame([6, 5], array_column($raffle, 'character_id'));
+        self::assertSame([1, 2], array_column($raffle, 'score_position'));
+        self::assertSame([1, 1], array_column($raffle, 'tickets'));
     }
 
     public function testStableNameOrderingBreaksTies(): void
@@ -138,8 +153,7 @@ final class CompetitionRulesTest extends TestCase
             ['killmail_id' => 4, 'character_id' => 4, 'character_name' => 'Eligible'],
         ]);
         $initial = $service->regionalWithEligibility($regional, $initialHagilur);
-        $initialPilot = array_values(array_filter($initial, static fn (array $pilot): bool => $pilot['character_id'] === 1))[0];
-        self::assertFalse($initialPilot['prize_eligible']);
+        self::assertNotContains(1, array_column($initial, 'character_id'));
         $newHagilur = $service->build([
             ['killmail_id' => 2, 'character_id' => 2, 'character_name' => 'Other'],
             ['killmail_id' => 3, 'character_id' => 3, 'character_name' => 'Other Two'],

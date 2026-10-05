@@ -1,4 +1,5 @@
 const previous = { hagilur: new Map(), regional: new Map(), raffle: new Map() };
+const MAX_DISPLAYED_PARTICIPANTS = 200;
 let recentKillSignature = "";
 let latestImportKey = null;
 let latestImportValue = null;
@@ -9,10 +10,64 @@ const labels = {
   active: "THE BLOODSHED ENDS IN",
   ended: "THE BLOODSHED HAS ENDED",
 };
+const tickerKillDescriptions = [
+  "murdered",
+  "butchered",
+  "slaughtered",
+  "massacred",
+  "mutilated",
+  "eviscerated",
+  "dismembered",
+  "decapitated",
+  "impaled",
+  "flayed",
+  "gutted",
+  "mangled",
+  "pulped",
+  "pulverised",
+  "obliterated",
+  "annihilated",
+  "eradicated",
+  "exterminated",
+  "vaporised",
+  "atomised",
+  "incinerated",
+  "immolated",
+  "dissolved",
+  "liquefied",
+  "shredded",
+  "sacrificed",
+  "harvested",
+  "exorcised",
+  "banished",
+  "damned",
+  "entombed",
+  "erased from existence",
+  "consigned to oblivion",
+  "fed to the void",
+  "offered to the darkness",
+  "turned into a corpse",
+  "rendered deceased",
+  "catastrophically unalived",
+];
 function escapeHtml(value) {
   const node = document.createElement("div");
   node.textContent = value ?? "";
   return node.innerHTML;
+}
+function getZkillUrl(value) {
+  try {
+    const url = new URL(value);
+    if (
+      url.protocol !== "https:" ||
+      !["zkillboard.com", "www.zkillboard.com"].includes(url.hostname)
+    ) {
+      return null;
+    }
+    return url.href;
+  } catch {
+    return null;
+  }
 }
 function setLatestImport(value, killCount, latestKillId, updateSignal) {
   const nextValue = value || null;
@@ -44,7 +99,10 @@ function updateLatestImport() {
 function renderBoard(id, rows, type) {
   const list = document.getElementById(id);
   const old = previous[type];
-  list.innerHTML = rows
+  const displayedRows = (rows || []).slice(0, MAX_DISPLAYED_PARTICIPANTS);
+  const visibleRows =
+    type === "raffle" ? displayedRows : displayedRows.slice(3);
+  list.innerHTML = visibleRows
     .map((pilot, index) => {
       const moved =
         old.has(pilot.character_id) &&
@@ -67,20 +125,33 @@ function renderBoard(id, rows, type) {
             ? `REGIONAL PRIZE ${pilot.prize_position}`
             : "";
       const score = type === "raffle" ? pilot.tickets : pilot.kills;
-      return `<li class="row ${index < 3 ? "top" : ""} ${type === "regional" && !pilot.prize_eligible ? "muted" : ""} ${moved ? "changed" : ""}"><span class="rank">${pilot.score_position}</span><img class="portrait" src="${portrait}" alt=""><span class="affiliation-logos">${affiliationLogos}</span><span class="pilot"><span class="name">${escapeHtml(pilot.character_name)}</span><span class="badge">${badge}</span></span><span class="score">${score}</span></li>`;
+      const scoreLabel = type === "raffle" ? "TICKETS" : "KILLS";
+      const characterUrl = `https://zkillboard.com/character/${Number(pilot.character_id)}/`;
+      return `<li class="row ${index < 3 && type !== "raffle" ? "top" : ""} ${type === "regional" && !pilot.prize_eligible ? "muted" : ""} ${moved ? "changed" : ""}"><span class="rank">${pilot.score_position}</span><img class="portrait" src="${portrait}" alt=""><span class="affiliation-logos">${affiliationLogos}</span><span class="pilot"><span class="name"><a href="${characterUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(pilot.character_name)}</a></span><span class="badge">${badge}</span></span><span class="score">${score} ${scoreLabel}</span></li>`;
     })
     .join("");
-  rows.forEach((pilot) => old.set(pilot.character_id, pilot.score_position));
+  visibleRows.forEach((pilot) => old.set(pilot.character_id, pilot.score_position));
 }
-function renderPodium(id, rows) {
+function renderPodium(id, rows, scoreKey = "kills", usePrizePosition = true) {
   const podium = document.getElementById(id);
   if (!podium) return;
   podium.innerHTML = rows
     .slice(0, 3)
-    .map(
-      (pilot) =>
-        `<div class="podium-slot place-${pilot.prize_position || pilot.score_position}"><span>${pilot.prize_position || pilot.score_position}</span><img class="podium-portrait" src="https://images.evetech.net/characters/${pilot.character_id}/portrait?size=64" alt="" loading="lazy"><b>${escapeHtml(pilot.character_name)}</b><small>${pilot.kills} KILLS</small></div>`,
-    )
+    .map((pilot) => {
+      const position = usePrizePosition
+        ? pilot.prize_position || pilot.score_position
+        : pilot.score_position;
+      const medal = {
+        1: ["gold.png", "Gold medal"],
+        2: ["silver.png", "Silver medal"],
+        3: ["bronze.png", "Bronze medal"],
+      }[position];
+      const medalMarkup = medal
+        ? `<img class="podium-medal" src="/assets/img/${medal[0]}" alt="${medal[1]}" loading="lazy">`
+        : "";
+      const characterUrl = `https://zkillboard.com/character/${Number(pilot.character_id)}/`;
+      return `<div class="podium-slot place-${position}"><div class="podium-portrait-wrap">${medalMarkup}<img class="podium-portrait" src="https://images.evetech.net/characters/${pilot.character_id}/portrait?size=64" alt="" loading="lazy"></div><b><a href="${characterUrl}" target="_blank" rel="noopener noreferrer">${escapeHtml(pilot.character_name)}</a></b><small>${pilot[scoreKey] ?? 0} ${scoreKey.toUpperCase()}</small></div>`;
+    })
     .join("");
 }
 function renderTicker(kills) {
@@ -98,7 +169,7 @@ function renderTicker(kills) {
   const track = document.getElementById("ticker-track");
   if (uniqueKills.length === 0) {
     track.innerHTML =
-      '<span class="ticker-entry">Awaiting the next transmission...</span>';
+      '<span class="ticker-entry">💀 Awaiting the next transmission... 💀</span>';
     return;
   }
   const entries = uniqueKills
@@ -108,15 +179,80 @@ function renderTicker(kills) {
         (kill.victim_ship_type_id
           ? `Ship type #${kill.victim_ship_type_id}`
           : "a ship");
-      const url = kill.zkill_url || "#";
-      return `<a class="ticker-entry" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(kill.attacker_name || "A pilot")} destroyed ${escapeHtml(ship)} in ${escapeHtml(kill.solar_system_name || `System ${kill.solar_system_id}`)}!</a>`;
+      const url = getZkillUrl(kill.zkill_url);
+      const description =
+        tickerKillDescriptions[
+          Math.floor(Math.random() * tickerKillDescriptions.length)
+        ];
+      const report = `${escapeHtml(kill.attacker_name || "A pilot")} ${description} a ${escapeHtml(ship)} in ${escapeHtml(kill.solar_system_name || `System ${kill.solar_system_id}`)}!`;
+      const tickerEntry = `💀 ${report} 💀`;
+      return url
+        ? `<a class="ticker-entry" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${tickerEntry}</a>`
+        : `<span class="ticker-entry">${tickerEntry}</span>`;
     })
     .join("");
   const copy = entries.replaceAll(
     'class="ticker-entry"',
-    'class="ticker-entry" aria-hidden="true"',
+    'class="ticker-entry" aria-hidden="true" tabindex="-1"',
   );
   track.innerHTML = entries + copy;
+}
+function enableLeaderboardKeyboardScrolling() {
+  document.querySelectorAll(".leaderboard-scroll").forEach((region) => {
+    region.addEventListener("keydown", (event) => {
+      const pageStep = Math.max(region.clientHeight - 32, 40);
+      let destination;
+      switch (event.key) {
+        case "ArrowDown":
+          destination = region.scrollTop + 40;
+          break;
+        case "ArrowUp":
+          destination = region.scrollTop - 40;
+          break;
+        case "PageDown":
+          destination = region.scrollTop + pageStep;
+          break;
+        case "PageUp":
+          destination = region.scrollTop - pageStep;
+          break;
+        case "Home":
+          destination = 0;
+          break;
+        case "End":
+          destination = region.scrollHeight;
+          break;
+        case " ":
+          destination = region.scrollTop + (event.shiftKey ? -pageStep : pageStep);
+          break;
+        default:
+          if (event.code !== "Space") return;
+          destination = region.scrollTop + (event.shiftKey ? -pageStep : pageStep);
+      }
+      event.preventDefault();
+      region.scrollTop = destination;
+    });
+  });
+}
+function enableMusicToggle() {
+  const button = document.getElementById("music-toggle");
+  const music = new Audio("/assets/sound/level1.mp3");
+  music.loop = true;
+  music.volume = 0.3;
+  button.addEventListener("click", async () => {
+    if (music.paused) {
+      try {
+        await music.play();
+        button.textContent = "MUSIC: ON";
+        button.setAttribute("aria-pressed", "true");
+      } catch {
+        button.textContent = "MUSIC: OFF";
+      }
+      return;
+    }
+    music.pause();
+    button.textContent = "MUSIC: OFF";
+    button.setAttribute("aria-pressed", "false");
+  });
 }
 function updateCountdown(event) {
   const now = Date.now();
@@ -171,18 +307,13 @@ async function refresh() {
     document.getElementById("live-tag").lastChild.textContent = workerOnline
       ? " LIVE FEED"
       : " WORKER OFFLINE";
-    document.getElementById("connection").textContent = workerOnline
-      ? "LIVE DATA CONNECTED"
-      : "LIVE WORKER NOT RUNNING";
-    document.getElementById("connection").style.color = workerOnline
-      ? "#76d58e"
-      : "#ed2433";
     window.latestEvent = data.event;
   } catch (error) {
-    document.getElementById("connection").textContent = "LIVE DATA DELAYED";
-    document.getElementById("connection").style.color = "#ed2433";
+    document.getElementById("live-tag").lastChild.textContent = " LIVE DATA DELAYED";
   }
 }
+enableLeaderboardKeyboardScrolling();
+enableMusicToggle();
 refresh();
 setInterval(refresh, 10000);
 setInterval(() => {

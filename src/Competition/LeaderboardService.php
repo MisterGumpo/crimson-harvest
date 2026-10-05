@@ -49,13 +49,31 @@ final class LeaderboardService
     public function regionalWithEligibility(array $regional, array $hagilur): array
     {
         $hagilurWinners = array_fill_keys(array_column(array_slice($hagilur, 0, 3), 'character_id'), true);
-        $prizePosition = 0;
-        foreach ($regional as &$pilot) {
-            $pilot['prize_eligible'] = !isset($hagilurWinners[$pilot['character_id']]);
-            $pilot['ineligibility_reason'] = $pilot['prize_eligible'] ? null : 'hagilur_winner';
-            $pilot['prize_position'] = $pilot['prize_eligible'] && ++$prizePosition <= 3 ? $prizePosition : null;
+        $regional = array_values(array_filter(
+            $regional,
+            static fn (array $pilot): bool => !isset($hagilurWinners[$pilot['character_id']])
+        ));
+        foreach ($regional as $index => &$pilot) {
+            $pilot['score_position'] = $index + 1;
+            $pilot['prize_eligible'] = true;
+            $pilot['ineligibility_reason'] = null;
+            $pilot['prize_position'] = $index < 3 ? $index + 1 : null;
         }
         unset($pilot);
         return $regional;
+    }
+
+    public function raffleFromRegional(array $regional): array
+    {
+        $raffle = array_values(array_filter(
+            $regional,
+            static fn (array $pilot): bool => $pilot['prize_position'] === null
+        ));
+        foreach ($raffle as $index => &$pilot) {
+            $pilot['score_position'] = $index + 1;
+            $pilot['tickets'] = $pilot['kills'];
+        }
+        unset($pilot);
+        return $raffle;
     }
 }
