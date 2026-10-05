@@ -192,6 +192,20 @@ a:hover {
     box-shadow: 0 0 8px var(--gold);
 }
 
+.live-tag.is-online span {
+    background: #52e58b;
+    box-shadow: 0 0 8px #52e58b;
+    animation: live-dot-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes live-dot-pulse {
+    50% {
+        opacity: 0.55;
+        transform: scale(1.35);
+        box-shadow: 0 0 14px #52e58b;
+    }
+}
+
 .countdown {
     min-width: 0;
     max-width: 360px;
@@ -650,6 +664,8 @@ a:hover {
 }
 
 .latest-kill-summary {
+    display: grid;
+    gap: 3px;
     margin: 9px 0 7px;
     font: 12px/1.35 "Comic Relief", cursive;
 }
@@ -673,6 +689,7 @@ a:hover {
 
 .latest-kill-link {
     display: inline-block;
+    white-space: nowrap;
     margin-top: 8px;
     padding: 4px 7px;
     border: 1px solid #9e4d42;
@@ -718,6 +735,14 @@ a:hover {
     border-image-source: url("../img/panel-borders.png");
     border-image-slice: 13%;
     border-image-repeat: round;
+}
+
+.latest-kill {
+    padding: 10px;
+}
+
+.ticker {
+    padding: 10px;
 }
 
 .promo-strip p {

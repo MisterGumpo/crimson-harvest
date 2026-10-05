@@ -1,6 +1,9 @@
 <?php
 
 declare(strict_types=1);
+
+require dirname(__DIR__) . '/bootstrap.php';
+$siteUrl = rtrim($config->app['url'], '/');
 ?>
 <!doctype html>
 <html lang="en">
@@ -8,7 +11,19 @@ declare(strict_types=1);
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Crimson Harvest 26 - PVP Contest </title>
+    <title>Crimson Harvest 26 - PVP Contest</title>
+    <meta name="description" content="Crimson Harvest 26 EVE Online PVP contest. Destroy. Dominate. Decimate. Compete for prizes.">
+    <link rel="icon" type="image/jpeg" href="/assets/img/favicon.jpg">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Crimson Harvest 26 - PVP Contest">
+    <meta property="og:description" content="Crimson Harvest 26 EVE Online PVP contest. Destroy. Dominate. Decimate. Compete for prizes.">
+    <meta property="og:url" content="<?= htmlspecialchars($siteUrl, ENT_QUOTES, 'UTF-8') ?>/">
+    <meta property="og:image" content="<?= htmlspecialchars($siteUrl, ENT_QUOTES, 'UTF-8') ?>/assets/img/preview.jpg">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Crimson Harvest 26 - PVP Contest">
+    <meta name="twitter:description" content="Crimson Harvest 26 EVE Online PVP contest. Destroy. Dominate. Decimate. Compete for prizes.">
+    <meta name="twitter:image" content="<?= htmlspecialchars($siteUrl, ENT_QUOTES, 'UTF-8') ?>/assets/img/preview.jpg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Comic+Relief:wght@400;700&display=swap" rel="stylesheet">

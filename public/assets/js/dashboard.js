@@ -304,12 +304,16 @@ async function refresh() {
     updateLatestImport();
     renderTicker(data.recentKills || []);
     const workerOnline = Boolean(data.ingestion?.workerOnline);
-    document.getElementById("live-tag").lastChild.textContent = workerOnline
+    const liveTag = document.getElementById("live-tag");
+    liveTag.classList.toggle("is-online", workerOnline);
+    liveTag.lastChild.textContent = workerOnline
       ? " LIVE FEED"
       : " WORKER OFFLINE";
     window.latestEvent = data.event;
   } catch (error) {
-    document.getElementById("live-tag").lastChild.textContent = " LIVE DATA DELAYED";
+    const liveTag = document.getElementById("live-tag");
+    liveTag.classList.remove("is-online");
+    liveTag.lastChild.textContent = " LIVE DATA DELAYED";
   }
 }
 enableLeaderboardKeyboardScrolling();
